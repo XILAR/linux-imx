@@ -1657,8 +1657,8 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
 	}
 
 #if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
-	iowrite32(ioread32(sgtl5000->pSAI_TCSR[rev]) | 0x50000000,sgtl5000->pSAI_TCSR[rev]);
-	iowrite32(ioread32(sgtl5000->pSAI_MCR[rev]) | 0xC0000000,sgtl5000->pSAI_MCR[rev]);
+	iowrite32(ioread32(sgtl5000->pSAI_TCSR[sgtl5000->sai]) | 0x50000000,sgtl5000->pSAI_TCSR[sgtl5000->sai]);
+	iowrite32(ioread32(sgtl5000->pSAI_MCR[sgtl5000->sai]) | 0xC0000000,sgtl5000->pSAI_MCR[sgtl5000->sai]);
 	udelay(1000);
 #else
 	/* Need 8 clocks before I2C accesses */
@@ -1835,6 +1835,16 @@ static int sgtl5000_i2c_remove(struct i2c_client *client)
 {
 	struct sgtl5000_priv *sgtl5000 = i2c_get_clientdata(client);
 
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	int rev;
+	for (rev=0;rev<7;rev++)
+	{
+		if (sgtl5000->pSAI_TCSR[rev])
+			iounmap(sgtl5000->pSAI_TCSR[rev]);
+		if (sgtl5000->pSAI_MCR[rev])
+			iounmap(sgtl5000->pSAI_MCR[rev]);
+	}
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	clk_disable_unprepare(sgtl5000->mclk);
 	regulator_bulk_disable(sgtl5000->num_supplies, sgtl5000->supplies);
 	regulator_bulk_free(sgtl5000->num_supplies, sgtl5000->supplies);
