@@ -146,12 +146,20 @@ struct sgtl5000_priv {
 	int num_supplies;
 	struct regmap *regmap;
 	struct clk *mclk;
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	struct clk *busclk;
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	int revision;
 	u8 micbias_resistor;
 	u8 micbias_voltage;
 	u8 lrclk_strength;
 	u8 sclk_strength;
 	u16 mute_state[LAST_POWER_EVENT + 1];
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	int sai;
+	u32 *pSAI_TCSR[7];
+	u32 *pSAI_MCR[7];
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 };
 
 static inline int hp_sel_input(struct snd_soc_component *component)
@@ -1582,6 +1590,16 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
 	sgtl5000 = devm_kzalloc(&client->dev, sizeof(*sgtl5000), GFP_KERNEL);
 	if (!sgtl5000)
 		return -ENOMEM;
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	sgtl5000->sai = client->addr - 0xa - 1;
+	client->addr = 0xa;
+
+	for (rev=0;rev<7;rev++)
+	{
+		sgtl5000->pSAI_TCSR[rev] = ioremap(0x30C10008 + (rev*0x10000),4);
+		sgtl5000->pSAI_MCR[rev] = ioremap(0x30C10100 + (rev*0x10000),4);
+	}
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 
 	i2c_set_clientdata(client, sgtl5000);
 
@@ -1596,7 +1614,30 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
 		goto disable_regs;
 	}
 
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+        sgtl5000->busclk = devm_clk_get(&client->dev, "bus");
+        if (IS_ERR(sgtl5000->busclk)) {
+                ret = PTR_ERR(sgtl5000->busclk);
+                /* Defer the probe to see if the clk will be provided later */
+                if (ret == -ENOENT)
+                        ret = -EPROBE_DEFER;
+
+                if (ret != -EPROBE_DEFER)
+                        dev_err(&client->dev, "Failed to get mclock: %d\n",
+                                ret);
+                goto disable_regs;
+        }
+
+	ret = clk_prepare_enable(sgtl5000->busclk);
+        if (ret) {
+                dev_err(&client->dev, "Error enabling clock %d\n", ret);
+                goto disable_regs;
+        }
+
+	sgtl5000->mclk = devm_clk_get(&client->dev, "mclk");
+#else
 	sgtl5000->mclk = devm_clk_get(&client->dev, NULL);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	if (IS_ERR(sgtl5000->mclk)) {
 		ret = PTR_ERR(sgtl5000->mclk);
 		/* Defer the probe to see if the clk will be provided later */
@@ -1615,8 +1656,14 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
 		goto disable_regs;
 	}
 
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	iowrite32(ioread32(sgtl5000->pSAI_TCSR[rev]) | 0x50000000,sgtl5000->pSAI_TCSR[rev]);
+	iowrite32(ioread32(sgtl5000->pSAI_MCR[rev]) | 0xC0000000,sgtl5000->pSAI_MCR[rev]);
+	udelay(1000);
+#else
 	/* Need 8 clocks before I2C accesses */
 	udelay(1);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 
 	/* read chip information */
 	ret = regmap_read(sgtl5000->regmap, SGTL5000_CHIP_ID, &reg);
