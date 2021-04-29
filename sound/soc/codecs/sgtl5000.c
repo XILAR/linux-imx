@@ -162,6 +162,192 @@ struct sgtl5000_priv {
 #endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 };
 
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+DEFINE_MUTEX(borea_sgtl_i2c_mutex);
+void borea_sgtl_i2c_lock(struct sgtl5000_priv *sgtl5000)
+{
+	mutex_lock(&borea_sgtl_i2c_mutex);
+	// disable other clocks and enable ours
+	iowrite32(ioread32(sgtl5000->pSAI_TCSR[0]) & ~0x50000000,sgtl5000->pSAI_TCSR[0]);
+	iowrite32(ioread32(sgtl5000->pSAI_MCR[0]) & ~0xC0000000,sgtl5000->pSAI_MCR[0]);
+	iowrite32(ioread32(sgtl5000->pSAI_TCSR[1]) & ~0x50000000,sgtl5000->pSAI_TCSR[1]);
+	iowrite32(ioread32(sgtl5000->pSAI_MCR[1]) & ~0xC0000000,sgtl5000->pSAI_MCR[1]);
+	iowrite32(ioread32(sgtl5000->pSAI_TCSR[4]) & ~0x50000000,sgtl5000->pSAI_TCSR[4]);
+	iowrite32(ioread32(sgtl5000->pSAI_MCR[4]) & ~0xC0000000,sgtl5000->pSAI_MCR[4]);
+	iowrite32(ioread32(sgtl5000->pSAI_TCSR[5]) & ~0x50000000,sgtl5000->pSAI_TCSR[5]);
+	iowrite32(ioread32(sgtl5000->pSAI_MCR[5]) & ~0xC0000000,sgtl5000->pSAI_MCR[5]);
+
+	iowrite32(ioread32(sgtl5000->pSAI_TCSR[sgtl5000->sai]) | 0x50000000,sgtl5000->pSAI_TCSR[sgtl5000->sai]);
+	iowrite32(ioread32(sgtl5000->pSAI_MCR[sgtl5000->sai]) | 0xC0000000,sgtl5000->pSAI_MCR[sgtl5000->sai]);
+
+	/* Need 8 clocks before I2C accesses */
+	udelay(1);
+}
+void borea_sgtl_i2c_unlock(struct sgtl5000_priv *sgtl5000)
+{
+	// enable all clocks
+	iowrite32(ioread32(sgtl5000->pSAI_TCSR[0]) | 0x50000000,sgtl5000->pSAI_TCSR[0]);
+	iowrite32(ioread32(sgtl5000->pSAI_MCR[0]) | 0xC0000000,sgtl5000->pSAI_MCR[0]);
+	iowrite32(ioread32(sgtl5000->pSAI_TCSR[1]) | 0x50000000,sgtl5000->pSAI_TCSR[1]);
+	iowrite32(ioread32(sgtl5000->pSAI_MCR[1]) | 0xC0000000,sgtl5000->pSAI_MCR[1]);
+	iowrite32(ioread32(sgtl5000->pSAI_TCSR[4]) | 0x50000000,sgtl5000->pSAI_TCSR[4]);
+	iowrite32(ioread32(sgtl5000->pSAI_MCR[4]) | 0xC0000000,sgtl5000->pSAI_MCR[4]);
+	iowrite32(ioread32(sgtl5000->pSAI_TCSR[5]) | 0x50000000,sgtl5000->pSAI_TCSR[5]);
+	iowrite32(ioread32(sgtl5000->pSAI_MCR[5]) | 0xC0000000,sgtl5000->pSAI_MCR[5]);
+	mutex_unlock(&borea_sgtl_i2c_mutex);
+}
+
+static unsigned int borea_snd_soc_component_read32(struct snd_soc_component *component, unsigned int reg)
+{
+	unsigned int ret;
+	struct sgtl5000_priv *sgtl = snd_soc_component_get_drvdata(component);
+	borea_sgtl_i2c_lock(sgtl);
+	ret = snd_soc_component_read32(component, reg);
+	borea_sgtl_i2c_unlock(sgtl);
+	return ret;
+}
+#define snd_soc_component_read32 borea_snd_soc_component_read32
+
+static int borea_snd_soc_component_update_bits(struct snd_soc_component *component,
+        unsigned int reg, unsigned int mask, unsigned int val)
+{
+	int ret;
+	struct sgtl5000_priv *sgtl = snd_soc_component_get_drvdata(component);
+	borea_sgtl_i2c_lock(sgtl);
+	ret = snd_soc_component_update_bits(component, reg, mask, val);
+	borea_sgtl_i2c_unlock(sgtl);
+	return ret;
+}
+#define snd_soc_component_update_bits borea_snd_soc_component_update_bits
+
+static int borea_snd_soc_component_write(struct snd_soc_component *component,
+        unsigned int reg, unsigned int val)
+{
+	int ret;
+	struct sgtl5000_priv *sgtl = snd_soc_component_get_drvdata(component);
+	borea_sgtl_i2c_lock(sgtl);
+	ret = snd_soc_component_write(component, reg, val);
+	borea_sgtl_i2c_unlock(sgtl);
+	return ret;
+}
+#define snd_soc_component_write borea_snd_soc_component_write
+
+#undef SOC_SINGLE
+#define SOC_SINGLE(xname, reg, shift, max, invert) \
+{		.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+		.info = borea_snd_soc_info_volsw, .get = borea_snd_soc_get_volsw,\
+		.put = borea_snd_soc_put_volsw, \
+		.private_value = SOC_SINGLE_VALUE(reg, shift, max, invert, 0) }
+
+#undef SOC_DOUBLE
+#define SOC_DOUBLE(xname, reg, shift_left, shift_right, max, invert) \
+{       .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = (xname),\
+        .info = borea_snd_soc_info_volsw, .get = borea_snd_soc_get_volsw, \
+        .put = borea_snd_soc_put_volsw, \
+        .private_value = SOC_DOUBLE_VALUE(reg, shift_left, shift_right, \
+                                          max, invert, 0) }
+
+#undef SOC_SINGLE_TLV
+#define SOC_SINGLE_TLV(xname, reg, shift, max, invert, tlv_array) \
+{       .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+        .access = SNDRV_CTL_ELEM_ACCESS_TLV_READ |\
+                 SNDRV_CTL_ELEM_ACCESS_READWRITE,\
+        .tlv.p = (tlv_array), \
+        .info = borea_snd_soc_info_volsw, .get = borea_snd_soc_get_volsw,\
+        .put = borea_snd_soc_put_volsw, \
+        .private_value = SOC_SINGLE_VALUE(reg, shift, max, invert, 0) }
+
+#undef SOC_DOUBLE_TLV
+#define SOC_DOUBLE_TLV(xname, reg, shift_left, shift_right, max, invert, tlv_array) \
+{       .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = (xname),\
+        .access = SNDRV_CTL_ELEM_ACCESS_TLV_READ |\
+                 SNDRV_CTL_ELEM_ACCESS_READWRITE,\
+        .tlv.p = (tlv_array), \
+        .info = borea_snd_soc_info_volsw, .get = borea_snd_soc_get_volsw, \
+        .put = borea_snd_soc_put_volsw, \
+        .private_value = SOC_DOUBLE_VALUE(reg, shift_left, shift_right, \
+                                          max, invert, 0) }
+
+#if 0
+#undef SOC_DAPM_ENUM
+#define SOC_DAPM_ENUM(xname, xenum) \
+{       .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+        .info = borea_snd_soc_info_enum_double, \
+        .get = borea_snd_soc_dapm_get_enum_double, \
+        .put = borea_snd_soc_dapm_put_enum_double, \
+        .private_value = (unsigned long)&xenum }
+#endif /* 0 */
+
+int borea_snd_soc_info_volsw(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_info *uinfo)
+{
+	int ret;
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct sgtl5000_priv *sgtl = snd_soc_component_get_drvdata(component);
+	borea_sgtl_i2c_lock(sgtl);
+	ret = snd_soc_info_volsw(kcontrol, uinfo);
+	borea_sgtl_i2c_unlock(sgtl);
+	return ret;
+}
+
+int borea_snd_soc_get_volsw(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+{
+	int ret;
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct sgtl5000_priv *sgtl = snd_soc_component_get_drvdata(component);
+	borea_sgtl_i2c_lock(sgtl);
+	ret = snd_soc_get_volsw(kcontrol, ucontrol);
+	borea_sgtl_i2c_unlock(sgtl);
+	return ret;
+}
+
+int borea_snd_soc_put_volsw(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+{
+	int ret;
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct sgtl5000_priv *sgtl = snd_soc_component_get_drvdata(component);
+	borea_sgtl_i2c_lock(sgtl);
+	ret = snd_soc_put_volsw(kcontrol, ucontrol);
+	borea_sgtl_i2c_unlock(sgtl);
+	return ret;
+}
+
+/* TODO: we will override this following functions as well. */
+#if 0
+int borea_snd_soc_info_enum_double(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_info *uinfo)
+{
+	int ret;
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct sgtl5000_priv *sgtl = snd_soc_component_get_drvdata(component);
+	borea_sgtl_i2c_lock(sgtl);
+	ret = snd_soc_info_enum_double(kcontrol, uinfo);
+	borea_sgtl_i2c_unlock(sgtl);
+	return ret;
+}
+
+int borea_snd_soc_dapm_get_enum_double(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+{
+	int ret;
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct sgtl5000_priv *sgtl = snd_soc_component_get_drvdata(component);
+	borea_sgtl_i2c_lock(sgtl);
+	ret = snd_soc_dapm_get_enum_double(kcontrol, ucontrol);
+	borea_sgtl_i2c_unlock(sgtl);
+	return ret;
+}
+
+int borea_snd_soc_dapm_put_enum_double(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+{
+	int ret;
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct sgtl5000_priv *sgtl = snd_soc_component_get_drvdata(component);
+	borea_sgtl_i2c_lock(sgtl);
+	ret = snd_soc_dapm_put_enum_double(kcontrol, ucontrol);
+	borea_sgtl_i2c_unlock(sgtl);
+	return ret;
+}
+#endif /* 0 */
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
+
 static inline int hp_sel_input(struct snd_soc_component *component)
 {
 	return (snd_soc_component_read32(component, SGTL5000_CHIP_ANA_CTRL) &
@@ -1140,19 +1326,34 @@ static int sgtl5000_set_bias_level(struct snd_soc_component *component,
 	case SND_SOC_BIAS_ON:
 	case SND_SOC_BIAS_PREPARE:
 	case SND_SOC_BIAS_STANDBY:
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+		borea_sgtl_i2c_lock(sgtl);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 		regcache_cache_only(sgtl->regmap, false);
 		ret = regcache_sync(sgtl->regmap);
 		if (ret) {
 			regcache_cache_only(sgtl->regmap, true);
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+			borea_sgtl_i2c_unlock(sgtl);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 			return ret;
 		}
 
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+		borea_sgtl_i2c_unlock(sgtl);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 		snd_soc_component_update_bits(component, SGTL5000_CHIP_ANA_POWER,
 				    SGTL5000_REFTOP_POWERUP,
 				    SGTL5000_REFTOP_POWERUP);
 		break;
 	case SND_SOC_BIAS_OFF:
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+		borea_sgtl_i2c_lock(sgtl);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 		regcache_cache_only(sgtl->regmap, true);
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+		borea_sgtl_i2c_unlock(sgtl);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 		snd_soc_component_update_bits(component, SGTL5000_CHIP_ANA_POWER,
 				    SGTL5000_REFTOP_POWERUP, 0);
 		break;
@@ -1570,7 +1771,13 @@ static void sgtl5000_fill_defaults(struct i2c_client *client)
 	for (i = 0; i < ARRAY_SIZE(sgtl5000_reg_defaults); i++) {
 		val = sgtl5000_reg_defaults[i].def;
 		index = sgtl5000_reg_defaults[i].reg;
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+		borea_sgtl_i2c_lock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 		ret = regmap_write(sgtl5000->regmap, index, val);
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+		borea_sgtl_i2c_unlock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 		if (ret)
 			dev_err(&client->dev,
 				"%s: error %d setting reg 0x%02x to 0x%04x\n",
@@ -1615,24 +1822,24 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
 	}
 
 #if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
-        sgtl5000->busclk = devm_clk_get(&client->dev, "bus");
-        if (IS_ERR(sgtl5000->busclk)) {
-                ret = PTR_ERR(sgtl5000->busclk);
-                /* Defer the probe to see if the clk will be provided later */
-                if (ret == -ENOENT)
-                        ret = -EPROBE_DEFER;
+	sgtl5000->busclk = devm_clk_get(&client->dev, "bus");
+	if (IS_ERR(sgtl5000->busclk)) {
+		ret = PTR_ERR(sgtl5000->busclk);
+		/* Defer the probe to see if the clk will be provided later */
+		if (ret == -ENOENT)
+			ret = -EPROBE_DEFER;
 
-                if (ret != -EPROBE_DEFER)
-                        dev_err(&client->dev, "Failed to get mclock: %d\n",
-                                ret);
-                goto disable_regs;
-        }
+		if (ret != -EPROBE_DEFER)
+			dev_err(&client->dev, "Failed to get mclock: %d\n",
+				ret);
+			goto disable_regs;
+	}
 
 	ret = clk_prepare_enable(sgtl5000->busclk);
-        if (ret) {
-                dev_err(&client->dev, "Error enabling clock %d\n", ret);
-                goto disable_regs;
-        }
+	if (ret) {
+		dev_err(&client->dev, "Error enabling clock %d\n", ret);
+		goto disable_regs;
+	}
 
 	sgtl5000->mclk = devm_clk_get(&client->dev, "mclk");
 #else
@@ -1655,18 +1862,17 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
 		dev_err(&client->dev, "Error enabling clock %d\n", ret);
 		goto disable_regs;
 	}
-
-#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
-	iowrite32(ioread32(sgtl5000->pSAI_TCSR[sgtl5000->sai]) | 0x50000000,sgtl5000->pSAI_TCSR[sgtl5000->sai]);
-	iowrite32(ioread32(sgtl5000->pSAI_MCR[sgtl5000->sai]) | 0xC0000000,sgtl5000->pSAI_MCR[sgtl5000->sai]);
-	udelay(1000);
-#else
 	/* Need 8 clocks before I2C accesses */
 	udelay(1);
-#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 
 	/* read chip information */
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	borea_sgtl_i2c_lock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	ret = regmap_read(sgtl5000->regmap, SGTL5000_CHIP_ID, &reg);
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	borea_sgtl_i2c_unlock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	if (ret) {
 		dev_err(&client->dev, "Error reading chip id %d\n", ret);
 		goto disable_clk;
@@ -1685,16 +1891,28 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
 	sgtl5000->revision = rev;
 
 	/* reconfigure the clocks in case we're using the PLL */
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	borea_sgtl_i2c_lock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	ret = regmap_write(sgtl5000->regmap,
 			   SGTL5000_CHIP_CLK_CTRL,
 			   SGTL5000_CHIP_CLK_CTRL_DEFAULT);
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	borea_sgtl_i2c_unlock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	if (ret)
 		dev_err(&client->dev,
 			"Error %d initializing CHIP_CLK_CTRL\n", ret);
 
 	/* Mute everything to avoid pop from the following power-up */
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	borea_sgtl_i2c_lock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	ret = regmap_write(sgtl5000->regmap, SGTL5000_CHIP_ANA_CTRL,
 			   SGTL5000_CHIP_ANA_CTRL_DEFAULT);
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	borea_sgtl_i2c_unlock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	if (ret) {
 		dev_err(&client->dev,
 			"Error %d muting outputs via CHIP_ANA_CTRL\n", ret);
@@ -1708,16 +1926,28 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
 	 * to circumvent this is disabling the bit first and waiting the proper
 	 * cool-down time.
 	 */
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	borea_sgtl_i2c_lock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	ret = regmap_read(sgtl5000->regmap, SGTL5000_CHIP_ANA_POWER, &value);
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	borea_sgtl_i2c_unlock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	if (ret) {
 		dev_err(&client->dev, "Failed to read ANA_POWER: %d\n", ret);
 		goto disable_clk;
 	}
 	if (value & SGTL5000_VAG_POWERUP) {
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+		borea_sgtl_i2c_lock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 		ret = regmap_update_bits(sgtl5000->regmap,
 					 SGTL5000_CHIP_ANA_POWER,
 					 SGTL5000_VAG_POWERUP,
 					 0);
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+		borea_sgtl_i2c_unlock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 		if (ret) {
 			dev_err(&client->dev, "Error %d disabling VAG\n", ret);
 			goto disable_clk;
@@ -1730,10 +1960,16 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
 	ana_pwr = SGTL5000_ANA_POWER_DEFAULT;
 	if (sgtl5000->num_supplies <= VDDD) {
 		/* internal VDDD at 1.2V */
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+		borea_sgtl_i2c_lock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 		ret = regmap_update_bits(sgtl5000->regmap,
 					 SGTL5000_CHIP_LINREG_CTRL,
 					 SGTL5000_LINREG_VDDD_MASK,
 					 LINREG_VDDD);
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+		borea_sgtl_i2c_unlock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 		if (ret)
 			dev_err(&client->dev,
 				"Error %d setting LINREG_VDDD\n", ret);
@@ -1750,7 +1986,13 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
 			     | SGTL5000_LINREG_SIMPLE_POWERUP);
 		dev_dbg(&client->dev, "Using external VDDD\n");
 	}
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	borea_sgtl_i2c_lock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	ret = regmap_write(sgtl5000->regmap, SGTL5000_CHIP_ANA_POWER, ana_pwr);
+#if defined(BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM)
+	borea_sgtl_i2c_unlock(sgtl5000);
+#endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
 	if (ret)
 		dev_err(&client->dev,
 			"Error %d setting CHIP_ANA_POWER to %04x\n",
@@ -1845,6 +2087,7 @@ static int sgtl5000_i2c_remove(struct i2c_client *client)
 			iounmap(sgtl5000->pSAI_MCR[rev]);
 	}
 #endif /* BOARD_RAKUNX8MPLUS_SIMPLEWAY_SOM */
+
 	clk_disable_unprepare(sgtl5000->mclk);
 	regulator_bulk_disable(sgtl5000->num_supplies, sgtl5000->supplies);
 	regulator_bulk_free(sgtl5000->num_supplies, sgtl5000->supplies);
@@ -1880,3 +2123,4 @@ module_i2c_driver(sgtl5000_i2c_driver);
 MODULE_DESCRIPTION("Freescale SGTL5000 ALSA SoC Codec Driver");
 MODULE_AUTHOR("Zeng Zhaoming <zengzm.kernel@gmail.com>");
 MODULE_LICENSE("GPL");
+

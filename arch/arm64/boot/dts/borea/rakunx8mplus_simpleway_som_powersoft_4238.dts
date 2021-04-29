@@ -33,18 +33,17 @@
 		simple-audio-card,bitclock-master = <&dailink_master1>;
 		simple-audio-card,frame-master = <&dailink_master1>;
 		status = "okay";
-
-                simple-audio-card,widgets =
-                        "Microphone", "Microphone Jack",
-                        "Headphone", "Headphone Jack",
-                        "Speaker", "Speaker Ext",
-                        "Line", "Line In Jack";
-                simple-audio-card,routing =
-                        "MIC_IN", "Microphone Jack",
-                        "Microphone Jack", "Mic Bias",
-                        "LINE_IN", "Line In Jack",
-                        "Headphone Jack", "HP_OUT",
-                        "Speaker Ext", "LINE_OUT";
+		simple-audio-card,widgets =
+			"Microphone", "Microphone Jack",
+			"Headphone", "Headphone Jack",
+			"Speaker", "Speaker Ext",
+			"Line", "Line In Jack";
+		simple-audio-card,routing =
+			"MIC_IN", "Microphone Jack",
+			"Microphone Jack", "Mic Bias",
+			"LINE_IN", "Line In Jack",
+			"Headphone Jack", "HP_OUT",
+			"Speaker Ext", "LINE_OUT";
 
 		simple-audio-card,cpu {
 			sound-dai = <&sai1>;
@@ -53,6 +52,97 @@
 		dailink_master1: simple-audio-card,codec {
 			sound-dai = <&sgtl5000_1>;
 			clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI1_MCLK1>;
+		};
+	};
+
+	sound2 {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "rakunx8mplus-sgtl5000-sai2";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,bitclock-master = <&dailink_master2>;
+		simple-audio-card,frame-master = <&dailink_master2>;
+		status = "okay";
+
+		simple-audio-card,widgets =
+			"Microphone", "Microphone Jack",
+			"Headphone", "Headphone Jack",
+			"Speaker", "Speaker Ext",
+			"Line", "Line In Jack";
+		simple-audio-card,routing =
+			"MIC_IN", "Microphone Jack",
+			"Microphone Jack", "Mic Bias",
+			"LINE_IN", "Line In Jack",
+			"Headphone Jack", "HP_OUT",
+			"Speaker Ext", "LINE_OUT";
+
+		simple-audio-card,cpu {
+			sound-dai = <&sai2>;
+		};
+
+		dailink_master2: simple-audio-card,codec {
+			sound-dai = <&sgtl5000_2>;
+			clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI2_MCLK1>;
+		};
+	};
+
+	sound5 {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "rakunx8mplus-sgtl5000-sai5";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,bitclock-master = <&dailink_master5>;
+		simple-audio-card,frame-master = <&dailink_master5>;
+		status = "okay";
+
+		simple-audio-card,widgets =
+			"Microphone", "Microphone Jack",
+			"Headphone", "Headphone Jack",
+			"Speaker", "Speaker Ext",
+			"Line", "Line In Jack";
+		simple-audio-card,routing =
+			"MIC_IN", "Microphone Jack",
+			"Microphone Jack", "Mic Bias",
+			"LINE_IN", "Line In Jack",
+			"Headphone Jack", "HP_OUT",
+			"Speaker Ext", "LINE_OUT";
+
+		simple-audio-card,cpu {
+			sound-dai = <&sai5>;
+		};
+
+		dailink_master5: simple-audio-card,codec {
+			sound-dai = <&sgtl5000_5>;
+			clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI5_MCLK1>;
+		};
+	};
+
+
+	sound6 {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "rakunx8mplus-sgtl5000-sai6";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,bitclock-master = <&dailink_master6>;
+		simple-audio-card,frame-master = <&dailink_master6>;
+		status = "okay";
+
+		simple-audio-card,widgets =
+			"Microphone", "Microphone Jack",
+			"Headphone", "Headphone Jack",
+			"Speaker", "Speaker Ext",
+			"Line", "Line In Jack";
+		simple-audio-card,routing =
+			"MIC_IN", "Microphone Jack",
+			"Microphone Jack", "Mic Bias",
+			"LINE_IN", "Line In Jack",
+			"Headphone Jack", "HP_OUT",
+			"Speaker Ext", "LINE_OUT";
+
+		simple-audio-card,cpu {
+			sound-dai = <&sai6>;
+		};
+
+		dailink_master6: simple-audio-card,codec {
+			sound-dai = <&sgtl5000_6>;
+			clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI6_MCLK1>;
 		};
 	};
 
@@ -131,6 +221,48 @@
 		VDDIO-supply = <&sw2_reg>;
 		VDDD-supply = <&sw1_reg>;
 	};
+
+	sgtl5000_2: codec@c {
+		#sound-dai-cells = <0>;
+		compatible = "fsl,sgtl5000";
+		status = "okay";
+		reg = <0x0c>;
+		clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI2_IPG>, <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI2_MCLK1>;
+		clock-names = "bus", "mclk";
+		assigned-clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI2_MCLK1>;
+		assigned-clock-rates = <24576000>, <24576000>;
+		VDDA-supply = <&sw2_reg>;
+		VDDIO-supply = <&sw2_reg>;
+		VDDD-supply = <&sw1_reg>;
+	};
+
+	sgtl5000_5: codec@f {
+		#sound-dai-cells = <0>;
+		compatible = "fsl,sgtl5000";
+		status = "okay";
+		reg = <0x0f>;
+		clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI5_IPG>, <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI5_MCLK1>;
+		clock-names = "bus", "mclk";
+		assigned-clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI5_MCLK1>;
+		assigned-clock-rates = <24576000>, <24576000>;
+		VDDA-supply = <&sw2_reg>;
+		VDDIO-supply = <&sw2_reg>;
+		VDDD-supply = <&sw1_reg>;
+	};
+
+	sgtl5000_6: codec@10 {
+		#sound-dai-cells = <0>;
+		compatible = "fsl,sgtl5000";
+		status = "okay";
+		reg = <0x10>;
+		clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI6_IPG>, <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI6_MCLK1>;
+		clock-names = "bus", "mclk";
+		assigned-clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI6_MCLK1>;
+		assigned-clock-rates = <24576000>, <24576000>;
+		VDDA-supply = <&sw2_reg>;
+		VDDIO-supply = <&sw2_reg>;
+		VDDD-supply = <&sw1_reg>;
+	};
 };
 
 &irqsteer_hdmi {
@@ -198,12 +330,60 @@
 	pinctrl-0 = <&pinctrl_sai1>;
 	assigned-clocks = <&clk IMX8MP_CLK_SAI1>;
 	assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
-        assigned-clock-rates = <24000000>;
-        clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI1_IPG>, <&clk IMX8MP_CLK_DUMMY>,
-                <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI1_MCLK1>, <&clk IMX8MP_CLK_DUMMY>,
-                <&clk IMX8MP_CLK_DUMMY>, <&clk IMX8MP_AUDIO_PLL1_OUT>,
-                <&clk IMX8MP_AUDIO_PLL2_OUT>;
-        clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
+	assigned-clock-rates = <24000000>;
+	clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI1_IPG>, <&clk IMX8MP_CLK_DUMMY>,
+		<&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI1_MCLK1>, <&clk IMX8MP_CLK_DUMMY>,
+		<&clk IMX8MP_CLK_DUMMY>, <&clk IMX8MP_AUDIO_PLL1_OUT>,
+		<&clk IMX8MP_AUDIO_PLL2_OUT>;
+	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
+	fsl,sai-mclk-direction-output;
+	status = "okay";
+};
+
+&sai2 {
+	#sound-dai-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sai2>;
+	assigned-clocks = <&clk IMX8MP_CLK_SAI2>;
+	assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
+	assigned-clock-rates = <24000000>;
+	clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI2_IPG>, <&clk IMX8MP_CLK_DUMMY>,
+		<&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI2_MCLK1>, <&clk IMX8MP_CLK_DUMMY>,
+		<&clk IMX8MP_CLK_DUMMY>, <&clk IMX8MP_AUDIO_PLL1_OUT>,
+		<&clk IMX8MP_AUDIO_PLL2_OUT>;
+	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
+	fsl,sai-mclk-direction-output;
+	status = "okay";
+};
+
+&sai5 {
+	#sound-dai-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sai5>;
+	assigned-clocks = <&clk IMX8MP_CLK_SAI5>;
+	assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
+	assigned-clock-rates = <24000000>;
+	clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI5_IPG>, <&clk IMX8MP_CLK_DUMMY>,
+		<&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI5_MCLK1>, <&clk IMX8MP_CLK_DUMMY>,
+		<&clk IMX8MP_CLK_DUMMY>, <&clk IMX8MP_AUDIO_PLL1_OUT>,
+		<&clk IMX8MP_AUDIO_PLL2_OUT>;
+	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
+	fsl,sai-mclk-direction-output;
+	status = "okay";
+};
+
+&sai6 {
+	#sound-dai-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sai6>;
+	assigned-clocks = <&clk IMX8MP_CLK_SAI6>;
+	assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
+	assigned-clock-rates = <24000000>;
+	clocks = <&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI6_IPG>, <&clk IMX8MP_CLK_DUMMY>,
+		<&audiomix_clk IMX8MP_CLK_AUDIOMIX_SAI6_MCLK1>, <&clk IMX8MP_CLK_DUMMY>,
+		<&clk IMX8MP_CLK_DUMMY>, <&clk IMX8MP_AUDIO_PLL1_OUT>,
+		<&clk IMX8MP_AUDIO_PLL2_OUT>;
+	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
 	fsl,sai-mclk-direction-output;
 	status = "okay";
 };
