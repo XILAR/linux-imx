@@ -163,6 +163,24 @@
 		regulator-boot-on;
 		regulator-always-on;
 	};
+
+	usb_reg_1: regulator@2 {
+		compatible = "regulator-fixed";
+		regulator-name = "USB1_VBUS";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+		regulator-always-on;
+	};
+
+	usb_reg_2: regulator@3 {
+		compatible = "regulator-fixed";
+		regulator-name = "USB2_VBUS";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+		regulator-always-on;
+	};
 };
 
 &aud2htx {
@@ -405,6 +423,7 @@
 
 &usb3_phy0 {
 	status = "okay";
+	vbus-supply = <&usb_reg_1>;
 };
 
 &usb3_0 {
@@ -422,6 +441,7 @@
 
 &usb3_phy1 {
 	status = "okay";
+	vbus-supply = <&usb_reg_2>;
 };
 
 &usb3_1 {
