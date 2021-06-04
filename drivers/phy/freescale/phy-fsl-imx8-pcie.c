@@ -15,6 +15,10 @@
 
 #define IMX8MP_PCIE_PHY_CMN_REG020	0x80
 #define  PLL_ANA_LPF_R_SEL_FINE_0_4	0x04
+#if defined(BOREA)
+#define IMX8MP_PCIE_PHY_CMN_REG036	0xD8
+#define  PLL_PMS_SDIV_8_4		0x32
+#endif /* BOREA */
 #define IMX8MP_PCIE_PHY_CMN_REG061	0x184
 #define  ANA_PLL_CLK_OUT_TO_EXT_IO_EN	BIT(0)
 #define IMX8MP_PCIE_PHY_CMN_REG062	0x188
@@ -34,6 +38,17 @@
 #define  LANE_TX_DATA_CLK_MUX_SEL	0x00
 
 #define IMX8MP_PCIE_PHY_TRSV_REG001	0x404
+#if defined(BOREA)
+#define  LN0_OVRD_TX_DRV_LVL		0x2D
+#define IMX8MP_PCIE_PHY_TRSV_REG020	0x480
+#define  LN0_RX_CDR_REFDIV_1_2		1
+#define IMX8MP_PCIE_PHY_TRSV_REG022	0x488
+#define  LN0_RX_CDR_REFDIV_1_1		0
+#define IMX8MP_PCIE_PHY_TRSV_REG0BB	0x6EC
+#define  LN0_TXD_DESKEW_BYPASS		BIT(2)
+#define IMX8MP_PCIE_PHY_TRSV_REG0CF	0x73C
+#define  LN0_MISC_TX_CLK_SRC		BIT(2)
+#else
 #define  LN0_OVRD_TX_DRV_LVL		0x3F
 #define IMX8MP_PCIE_PHY_TRSV_REG005	0x414
 #define  LN0_OVRD_TX_DRV_PST_LVL_G1	0x2B
@@ -61,6 +76,7 @@
 #define  LN0_RX_CDR_FBB_FINE_G3_G4	0x53
 #define IMX8MP_PCIE_PHY_TRSV_REG206	0x738
 #define  LN0_TG_RX_SIGVAL_LBF_DELAY	0x4
+#endif /* BOREA */
 
 struct imx8_pcie_phy {
 	struct phy *phy;
@@ -137,6 +153,7 @@ static int imx8_pcie_phy_cal(struct phy *phy)
 	 */
 	writel(LN0_OVRD_TX_DRV_LVL,
 	       imx8_phy->base + IMX8MP_PCIE_PHY_TRSV_REG001);
+#if !defined(BOREA)
 	writel(LN0_OVRD_TX_DRV_PST_LVL_G1,
 	       imx8_phy->base + IMX8MP_PCIE_PHY_TRSV_REG005);
 	writel(LN0_OVRD_TX_DRV_PST_LVL_G2,
@@ -163,6 +180,7 @@ static int imx8_pcie_phy_cal(struct phy *phy)
 	       imx8_phy->base + IMX8MP_PCIE_PHY_TRSV_REG159);
 	writel(LN0_TG_RX_SIGVAL_LBF_DELAY,
 	       imx8_phy->base + IMX8MP_PCIE_PHY_TRSV_REG206);
+#endif /* !BOREA */
 
 	writel(PLL_ANA_LPF_R_SEL_FINE_0_4,
 	       imx8_phy->base + IMX8MP_PCIE_PHY_CMN_REG020);
@@ -170,6 +188,22 @@ static int imx8_pcie_phy_cal(struct phy *phy)
 	       imx8_phy->base + IMX8MP_PCIE_PHY_CMN_REG076);
 	writel(LANE_TX_DATA_CLK_MUX_SEL,
 	       imx8_phy->base + IMX8MP_PCIE_PHY_CMN_REG078);
+
+#if defined(BOREA)
+	/* setup_deskew_fifo_bypass to workaround ERR050442 */
+	udelay(1);
+	writel(PLL_PMS_SDIV_8_4,
+	       imx8_phy->base + IMX8MP_PCIE_PHY_CMN_REG036);
+	writel(LN0_RX_CDR_REFDIV_1_2,
+	       imx8_phy->base + IMX8MP_PCIE_PHY_TRSV_REG020);
+	writel(LN0_RX_CDR_REFDIV_1_1,
+	       imx8_phy->base + IMX8MP_PCIE_PHY_TRSV_REG022);
+	writel(LN0_MISC_TX_CLK_SRC,
+	       imx8_phy->base + IMX8MP_PCIE_PHY_TRSV_REG0CF);
+	writel(LN0_TXD_DESKEW_BYPASS,
+	       imx8_phy->base + IMX8MP_PCIE_PHY_TRSV_REG0BB);
+	udelay(1);
+#endif /* BOREA */
 
 	return 0;
 }
