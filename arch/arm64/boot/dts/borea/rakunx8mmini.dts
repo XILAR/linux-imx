@@ -559,6 +559,13 @@
 		>;
 	};
 
+	pinctrl_mipi_dsi_en: mipi_dsi_en {
+		fsl,pins = <
+			MX8MM_IOMUXC_GPIO1_IO08_GPIO1_IO8               0x16
+		>;
+	};
+
+
 	pinctrl_wdog: wdoggrp {
 		fsl,pins = <
 			MX8MM_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B	0xc6
@@ -579,6 +586,17 @@
 
 &mipi_dsi {
 	status = "okay";
+	panel@0 {
+		compatible = "raydium,rm67191";
+		reg = <0>;
+		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+		reset-gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
+		dsi-lanes = <4>;
+		video-mode = <2>;
+		panel-width-mm = <68>;
+		panel-height-mm = <121>;
+		status = "okay";
+	};
 };
 
 &vpu_g1 {

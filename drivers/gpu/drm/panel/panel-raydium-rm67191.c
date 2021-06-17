@@ -263,6 +263,10 @@ static int rm67191_enable(struct rad_panel *panel)
 	int color_format = color_format_from_dsi_format(dsi->format);
 	int ret;
 
+#if defined(CONFIG_BOARD_RAKUNX8MMINI)
+	panel->enabled=true;
+#endif /* CONFIG_BOARD_RAKUNX8MMINI */
+
 	if (panel->enabled)
 		return 0;
 
