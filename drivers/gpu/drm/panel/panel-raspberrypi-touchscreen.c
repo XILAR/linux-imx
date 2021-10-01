@@ -52,13 +52,18 @@
 #include <linux/of_device.h>
 #include <linux/of_graph.h>
 #include <linux/pm.h>
+#include <video/mipi_display.h>
+#include <video/of_videomode.h>
+#include <video/videomode.h>
 
-#include <drm/drm_crtc.h>
-#include <drm/drm_device.h>
-#include <drm/drm_mipi_dsi.h>
 #include <drm/drm_panel.h>
+#include <drm/drmP.h>
+#include <drm/drm_crtc.h>
+#include <drm/drm_mipi_dsi.h>
 
 #define RPI_DSI_DRIVER_NAME "rpi-ts-dsi"
+#define RPI_TS_I2C_ADAPTER     0
+#define RPI_TS_I2C_ADDR        0x45
 
 /* I2C registers of the Atmel microcontroller. */
 enum REG_ADDR {
@@ -159,6 +164,10 @@ enum REG_ADDR {
 #define HDISPR			0x0428
 #define VSR			0x042C
 #define VDISPR			0x0430
+#define HTIM1			0x0424
+#define HTIM2			0x0428
+#define VTIM1			0x042C
+#define VTIM2			0x0430
 #define VFUEN			0x0434
 
 /* DBI-B Host Registers */
@@ -196,6 +205,18 @@ struct rpi_touchscreen {
 	struct mipi_dsi_device *dsi;
 	struct i2c_client *i2c;
 };
+
+// 		.clock = 35979400 / 1000,
+// 		.hdisplay = 800,
+// 		.hsync_start = 800 + 106,
+// 		.hsync_end = 800 + 106 + 68,
+// 		.htotal = 800 + 106 + 68 + 172,
+// 		.vdisplay = 480,
+// 		.vsync_start = 480 + 3,
+// 		.vsync_end = 480 + 3 + 4,
+// 		.vtotal = 480 + 3 + 4 + 7,
+// 		.vrefresh = 60,
+// 	},
 
 static const struct drm_display_mode rpi_touchscreen_modes[] = {
 	{
@@ -253,6 +274,7 @@ static int rpi_touchscreen_write(struct rpi_touchscreen *ts, u16 reg, u32 val)
 
 static int rpi_touchscreen_disable(struct drm_panel *panel)
 {
+    printk("DISABLE!\n");
 	struct rpi_touchscreen *ts = panel_to_ts(panel);
 
 	rpi_touchscreen_i2c_write(ts, REG_PWM, 0);
@@ -272,8 +294,14 @@ static int rpi_touchscreen_enable(struct drm_panel *panel)
 {
 	struct rpi_touchscreen *ts = panel_to_ts(panel);
 	int i;
+    
+    printk("ENABLE1!!\n");
+    
 
+    msleep(1000);
+    printk("11\n");
 	rpi_touchscreen_i2c_write(ts, REG_POWERON, 1);
+    printk("22\n");
 	/* Wait for nPWRDWN to go low to indicate poweron is done. */
 	for (i = 0; i < 100; i++) {
 		if (rpi_touchscreen_i2c_read(ts, REG_PORTB) & 1)
@@ -288,6 +316,19 @@ static int rpi_touchscreen_enable(struct drm_panel *panel)
 	rpi_touchscreen_write(ts, PPI_D0S_ATMR, 0x00);
 	rpi_touchscreen_write(ts, PPI_D1S_ATMR, 0x00);
 	rpi_touchscreen_write(ts, PPI_LPTXTIMECNT, 0x03);
+    
+    
+    	/* Horizontal back porch and horizontal pulse width. 0x00280028 */
+	rpi_touchscreen_write(ts, HTIM1, 0x00280028);
+
+	/* Horizontal front porch and horizontal active video size. 0x00500500*/
+	rpi_touchscreen_write(ts, HTIM2, 0x00500500);
+
+	/* Vertical back porch and vertical sync pulse width. 0x000e000a */
+	rpi_touchscreen_write(ts, VTIM1, 0x000e000a);
+
+	/* Vertical front porch and vertical display size. 0x000e0320 */
+	rpi_touchscreen_write(ts, VTIM2, 0x000e0320);
 
 	rpi_touchscreen_write(ts, SPICMR, 0x00);
 	rpi_touchscreen_write(ts, LCDCTRL, 0x00100150);
@@ -357,27 +398,46 @@ static const struct drm_panel_funcs rpi_touchscreen_funcs = {
 	.get_modes = rpi_touchscreen_get_modes,
 };
 
-static int rpi_touchscreen_probe(struct i2c_client *i2c,
-				 const struct i2c_device_id *id)
+static int rpi_touchscreen_probe(struct mipi_dsi_device *dsi)
 {
-	struct device *dev = &i2c->dev;
-	struct rpi_touchscreen *ts;
-	struct device_node *endpoint, *dsi_host_node;
-	struct mipi_dsi_host *host;
+        printk("JAJAJAJ\n");
+
+    struct rpi_touchscreen *ts = mipi_dsi_get_drvdata(dsi);
+	struct device *dev = &dsi->dev;
 	int ret, ver;
-	struct mipi_dsi_device_info info = {
-		.type = RPI_DSI_DRIVER_NAME,
-		.channel = 0,
-		.node = NULL,
+    
+    printk("JAJAJAJ\n");
+
+	struct i2c_adapter *adapter;
+	struct i2c_client *client;
+	struct i2c_board_info info = {
+		.type = "rpi-ts",
+		.addr = RPI_TS_I2C_ADDR,
 	};
 
 	ts = devm_kzalloc(dev, sizeof(*ts), GFP_KERNEL);
 	if (!ts)
 		return -ENOMEM;
 
-	i2c_set_clientdata(i2c, ts);
+    mipi_dsi_set_drvdata(dsi, ts);
+    ts->dsi = dsi;
 
-	ts->i2c = i2c;
+    /* HACK setup i2c driver */
+    adapter = i2c_get_adapter(RPI_TS_I2C_ADAPTER);
+	if (!adapter) {
+		pr_err("%s: i2c_get_adapter(%d) failed\n", __func__,
+			RPI_TS_I2C_ADAPTER);
+		return -EINVAL;
+	}
+
+	client = i2c_new_device(adapter, &info);
+	if (!client) {
+		pr_err("%s: i2c_new_device() failed\n", __func__);
+		i2c_put_adapter(adapter);
+		return -EINVAL;
+	}
+
+ 	ts->i2c = client;
 
 	ver = rpi_touchscreen_i2c_read(ts, REG_ID);
 	if (ver < 0) {
@@ -396,71 +456,23 @@ static int rpi_touchscreen_probe(struct i2c_client *i2c,
 
 	/* Turn off at boot, so we can cleanly sequence powering on. */
 	rpi_touchscreen_i2c_write(ts, REG_POWERON, 0);
+    
+    printk("JAJCA4\n");
 
-	/* Look up the DSI host.  It needs to probe before we do. */
-	endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
-	if (!endpoint)
-		return -ENODEV;
+    printk("JAJCA45\n");
 
-	dsi_host_node = of_graph_get_remote_port_parent(endpoint);
-	if (!dsi_host_node)
-		goto error;
-
-	host = of_find_mipi_dsi_host_by_node(dsi_host_node);
-	of_node_put(dsi_host_node);
-	if (!host) {
-		of_node_put(endpoint);
-		return -EPROBE_DEFER;
-	}
-
-	info.node = of_graph_get_remote_port(endpoint);
-	if (!info.node)
-		goto error;
-
-	of_node_put(endpoint);
-
-	ts->dsi = mipi_dsi_device_register_full(host, &info);
-	if (IS_ERR(ts->dsi)) {
-		dev_err(dev, "DSI device registration failed: %ld\n",
-			PTR_ERR(ts->dsi));
-		return PTR_ERR(ts->dsi);
-	}
-
-	drm_panel_init(&ts->base);
-	ts->base.dev = dev;
-	ts->base.funcs = &rpi_touchscreen_funcs;
 
 	/* This appears last, as it's what will unblock the DSI host
 	 * driver's component bind function.
 	 */
-	ret = drm_panel_add(&ts->base);
+
+    	ts->base.dev = dev;
+	ts->base.funcs = &rpi_touchscreen_funcs;
+    	ret = drm_panel_add(&ts->base);
 	if (ret)
 		return ret;
 
-	return 0;
-
-error:
-	of_node_put(endpoint);
-	return -ENODEV;
-}
-
-static int rpi_touchscreen_remove(struct i2c_client *i2c)
-{
-	struct rpi_touchscreen *ts = i2c_get_clientdata(i2c);
-
-	mipi_dsi_detach(ts->dsi);
-
-	drm_panel_remove(&ts->base);
-
-	mipi_dsi_device_unregister(ts->dsi);
-	kfree(ts->dsi);
-
-	return 0;
-}
-
-static int rpi_touchscreen_dsi_probe(struct mipi_dsi_device *dsi)
-{
-	int ret;
+    printk("ALL GOOD\n");
 
 	dsi->mode_flags = (MIPI_DSI_MODE_VIDEO |
 			   MIPI_DSI_MODE_VIDEO_SYNC_PULSE |
@@ -476,10 +488,21 @@ static int rpi_touchscreen_dsi_probe(struct mipi_dsi_device *dsi)
 	return ret;
 }
 
-static struct mipi_dsi_driver rpi_touchscreen_dsi_driver = {
-	.driver.name = RPI_DSI_DRIVER_NAME,
-	.probe = rpi_touchscreen_dsi_probe,
-};
+static int rpi_touchscreen_remove(struct mipi_dsi_device *dsi)
+{
+	struct rpi_touchscreen *ts = mipi_dsi_get_drvdata(dsi);
+	struct device *dev = &dsi->dev;
+	int ret;
+
+	ret = mipi_dsi_detach(dsi);
+	if (ret < 0)
+		DRM_DEV_ERROR(dev, "Failed to detach from host (%d)\n",
+			ret);
+
+	drm_panel_remove(&ts->base);
+
+	return 0;
+}
 
 static const struct of_device_id rpi_touchscreen_of_ids[] = {
 	{ .compatible = "raspberrypi,7inch-touchscreen-panel" },
@@ -487,28 +510,39 @@ static const struct of_device_id rpi_touchscreen_of_ids[] = {
 };
 MODULE_DEVICE_TABLE(of, rpi_touchscreen_of_ids);
 
-static struct i2c_driver rpi_touchscreen_driver = {
-	.driver = {
-		.name = "rpi_touchscreen",
+static struct mipi_dsi_driver rpi_touchscreen_dsi_driver = {
+    .driver = {
+		.name = RPI_DSI_DRIVER_NAME,
 		.of_match_table = rpi_touchscreen_of_ids,
 	},
 	.probe = rpi_touchscreen_probe,
 	.remove = rpi_touchscreen_remove,
 };
+module_mipi_dsi_driver(rpi_touchscreen_dsi_driver);
 
-static int __init rpi_touchscreen_init(void)
-{
-	mipi_dsi_driver_register(&rpi_touchscreen_dsi_driver);
-	return i2c_add_driver(&rpi_touchscreen_driver);
-}
-module_init(rpi_touchscreen_init);
+// static struct i2c_driver rpi_touchscreen_driver = {
+// 	.driver = {
+// 		.name = "rpi_touchscreen",
+// 		.of_match_table = rpi_touchscreen_of_ids,
+// 	},
+// 	.probe = rpi_touchscreen_probe,
+// 	.remove = rpi_touchscreen_remove,
+// };
+// 
+// static int __init rpi_touchscreen_init(void)
+// {
+// 	mipi_dsi_driver_register(&rpi_touchscreen_dsi_driver);
+// 	return i2c_add_driver(&rpi_touchscreen_driver);
+// }
+// module_init(rpi_touchscreen_init);
+// 
+// static void __exit rpi_touchscreen_exit(void)
+// {
+// 	i2c_del_driver(&rpi_touchscreen_driver);
+// 	mipi_dsi_driver_unregister(&rpi_touchscreen_dsi_driver);
+// }
+// module_exit(rpi_touchscreen_exit);
 
-static void __exit rpi_touchscreen_exit(void)
-{
-	i2c_del_driver(&rpi_touchscreen_driver);
-	mipi_dsi_driver_unregister(&rpi_touchscreen_dsi_driver);
-}
-module_exit(rpi_touchscreen_exit);
 
 MODULE_AUTHOR("Eric Anholt <eric@anholt.net>");
 MODULE_DESCRIPTION("Raspberry Pi 7-inch touchscreen driver");
