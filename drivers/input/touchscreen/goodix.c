@@ -782,7 +782,7 @@ static int goodix_configure_dev(struct goodix_ts_data *ts)
 				  ABS_MT_POSITION_Y, ts->prop.max_y);
 	}
 
-	if (dmi_check_system(rotated_screen)) {
+	if (1) {//dmi_check_system(rotated_screen)) {
 		ts->prop.invert_x = true;
 		ts->prop.invert_y = true;
 		dev_dbg(&ts->client->dev,
